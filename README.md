@@ -1,2 +1,2 @@
-# tools
-Collection of various scripts that help simplify a variety of tasks
+# utils
+Collection of scripts that help simplify a variety of tasks. More documentation to come later.
