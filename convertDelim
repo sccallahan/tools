@@ -1,0 +1,39 @@
+#! /usr/bin/env bash
+
+# taken from https://stackoverflow.com/questions/19271316/change-csv-file-delimiter-in-unix
+
+####################################################
+# Author: Carson Callahan
+# Date: 2020-03-25
+# Purpose: convert file delimiters
+####################################################
+
+#### set variables ####
+inputExt=$1
+inputDelim=$2
+outputDelim=$3
+outputExt=$4
+
+#### rough argument check ####
+if [ $# -eq 0 ]; then
+  echo "Usage: convertDelim {inputExt} {inputDelim} {outputDelim} {outputExt}"
+  echo "For tab, enter TAB. For punctuation, enter puncutation surrounded by single quotes, e.g. ',' for commas."
+  exit 1
+elif [ $# -lt 4 ]; then
+  echo "Not enough arguments! Usage: convertDelim {inputExt} {inputDelim} {outputDelim} {outputExt}"
+  exit 1
+elif [ $# -gt 4 ]; then
+  echo "Too many arguments! Usage: convertDelim {inputExt} {inputDelim} {outputDelim} {outputExt}"
+  exit 1
+fi
+
+
+#### script ####
+
+# Note: this requires 'csvtools'
+# Install with `sudo apt install csvtools` on linux
+
+for file in *${inputExt}; do
+	echo ${file}
+	csvtool -t ${inputDelim} -u ${outputDelim} cat ${file} -o ${file}${outputExt}
+done
