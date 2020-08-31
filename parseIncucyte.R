@@ -29,15 +29,22 @@
 # 1. dir = directory where .txt outputs are stored.
 # 2. skip = how many lines to skip before reading. Incucyte seems to have some blank spaces and metadata
 #           that aren't strictly needed for this.
-# 3. cell_line = cell line name
-# 4. treatment = treatment name
+# 3. cell_line = character; cell line name
+# 4. treatment = character; treatment name
 # 5. max_conc = integer; maximum concentration used (in uM)
 # 6. dilution = integer; the fold dilution used between wells
-# 7. series = concentrations used; only if not using max_conc + dilution;
+# 7. series = integer vector; concentrations used; only if not using max_conc + dilution;
 #             e.g. c(100, 80, 60, 10)
 # 8. control_well_num = integer; the column number used as control (e.g. DMSO in column 2)
 # 9. control2_well_num = integer; column number for the second control (if used)
-# 10. time = integer; the duration of the treatment; By default, this is pulled from the maximum incucyte "elapsed" value
+# 10. rm_artefact = integer or vector; columns with obvious technical artefacts to be excluded
+# 11. time_0 = integer; the time recorded by incucyte where you have set your experimental T0;
+#             by default, this is pulled from the minimum incucyte "elapsed" value
+# 12. time_F = integer; the time recorded by incucyte where you have set your experimental Tfinal;
+#             by default, this is pulled from the maximum incucyte "elapsed" value
+# 13. time_E = integer; the amount of time your experiment took; by default, this is pulled from the maximum
+#             incucyte "elapsed" value (and is therefore equal to time_F) -- this should be changed if the
+#             experiment duration does not match the incucyte time (e.g. if time_0 is at 24hr, time_F is 96, time_E is 72)
 
 
 #### Usage ####
@@ -49,8 +56,8 @@
 
 parseIncucyte <- function(dir, skip = 2, cell_line, treatment,
                           max_conc = NULL, dilution = NULL, series = NULL,
-                          control_well_num, control2_well_num = NULL,
-                          time = max(dat$Elapsed)){
+                          control_well_num, control2_well_num = NULL, rm_artefact = NULL,
+                          time_0 = min(dat$Elapsed), time_F = max(dat$Elapsed), time_E = max(dat$Elapsed)){
   #### change pattern if needed ####
   files <- list.files(path = dir, pattern = "*_well.txt")
   
@@ -61,8 +68,8 @@ parseIncucyte <- function(dir, skip = 2, cell_line, treatment,
     # ------------------------------ #
     # time can also be manually set if desired
     dat <- read.table(file = paste0(dir, file), sep = '\t', header = TRUE, skip = skip)
-    time_final <- max(dat$Elapsed)
-    time_start <- min(dat$Elapsed)
+    time_final <- time_F
+    time_start <- time_0
     
     # we generally don't need intermediate times for this analysis
     # filter for time0 and timeFinal
@@ -73,6 +80,17 @@ parseIncucyte <- function(dir, skip = 2, cell_line, treatment,
     # -------------------------------------------- #
     dat_prune <- dat_timepoints[, (!grepl("Std", colnames(dat_timepoints)))]
     dat_prune <- dat_prune[, -c(1:2)]
+    
+    
+    # -------------------------------------- #
+    #### remove any technically bad wells ####
+    # -------------------------------------- #
+    
+    if (!is.null(rm_artefact)){
+      dat_prune_final <- dat_prune[, !grepl(paste(rm_artefact, collapse = "|"), colnames(dat_prune))]
+    } else {
+      dat_prune_final <- dat_prune
+    }
     
     # ------------------------------- #
     #### calculate dilution series ####
@@ -107,7 +125,7 @@ parseIncucyte <- function(dir, skip = 2, cell_line, treatment,
     control <- control_well_num
     
     # isolate just the drug dilution data
-    dat_drug <- dat_prune[, !grepl(control, colnames(dat_prune))]
+    dat_drug <- dat_prune_final[, !grepl(control, colnames(dat_prune_final))]
     
     # allow for dual controls
     if(!is.null(control2_well_num)){
@@ -115,16 +133,17 @@ parseIncucyte <- function(dir, skip = 2, cell_line, treatment,
       dat_drug <- dat_drug[, !grepl(control2, colnames(dat_drug))]
     }
     
+    
     # ---------------------------- #
     #### get cell counts and CV ####
     # ---------------------------- #
-    cell_count__time0 <- apply(dat_prune, 1, mean)[1]
-    time0_stdev <- apply(dat_prune, 1, sd)[1]
+    cell_count__time0 <- apply(dat_prune_final, 1, mean)[1]
+    time0_stdev <- apply(dat_prune_final, 1, sd)[1]
     time0_cv <- time0_stdev/cell_count__time0*100
-    message("Coefficient of variation for initial cell counts is ", round(time0_cv, digits = 3), "%")
+    message("Coefficient of variation for initial ", file, " cell counts is ", round(time0_cv, digits = 3), "%")
     
     # average control counts at timeFinal
-    cell_count__ctrl <- apply(dat_prune[2, grepl(control, colnames(dat_prune))], 1, mean)
+    cell_count__ctrl <- apply(dat_prune_final[2, grepl(control, colnames(dat_prune_final))], 1, mean)
     
     # take timeFinal counts for drugs
     dat_drug_final <- dat_drug[2,]
@@ -148,7 +167,7 @@ parseIncucyte <- function(dir, skip = 2, cell_line, treatment,
                         perturbation = rep(0, times = nrow(tmp)),
                         #### change replicates here too if needed ####
                         replicate = c(rep(1, times = nrow(tmp)/3), rep(2, times = nrow(tmp)/3), rep(3, times = nrow(tmp)/3)),
-                        time = rep(time_final, times = nrow(tmp)),
+                        time = rep(time_E, times = nrow(tmp)),
                         concentration = tmp$concentration,
                         cell_count = tmp$cell_count,
                         cell_count__ctrl = rep(cell_count__ctrl, times = nrow(tmp)),
