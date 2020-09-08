@@ -34,6 +34,11 @@
 #' Default = maximum value from "Elapsed" column
 #' @param time_E Integer; the amount of time your experiment took; Default = time_F;
 #' Change if incucyte times are not correct
+#' 
+#' @note There are some strong assumptions made here about the layout of the plate. Generally, the `max_conc` and
+#' `dilution` arguments assume you use a set series dilution across the plate. Further, by default, the code
+#' assumes you have a total of 8 concentrations. If you have more or less than this, you can edit the code as needed. There
+#' is a label for the code block that handles this for easy navigation.
 #'
 #' @return Nothing. Writes files to disk.
 #' @export
@@ -107,6 +112,7 @@ parseIncucyte <- function(dir, skip = 2, pattern, treatment,
       } else {
         message("Series not provided, using provided max and dilution arguments")
         #### change dilution number/strategy as needed ####
+        # final exponent should be n-1 (e.g. 8 concentrations ends in dilution^7)
         conc <- c(max_conc, max_conc/dilution, max_conc/(dilution^2),
                   max_conc/(dilution^3), max_conc/(dilution^4), max_conc/(dilution^5), max_conc/(dilution^6), max_conc/(dilution^7))
       }
@@ -157,7 +163,13 @@ parseIncucyte <- function(dir, skip = 2, pattern, treatment,
     
     # I assume 3 replicates
     #### change reps if needed ####
-    tmp$conc <- as.data.frame(rep(conc, times = 3))
+    concList <- NULL
+    for (dose in conc){
+      x <- rep(dose, times = 3)
+      concList <- c(concList, x)
+    }
+    tmp$conc <- concList
+    # tmp$conc <- as.data.frame(rep(conc, times = 3))
     colnames(tmp) <- c("cell_count", "concentration")
     rownames(tmp) <- NULL
     
@@ -173,13 +185,14 @@ parseIncucyte <- function(dir, skip = 2, pattern, treatment,
                         treatment = rep(treatment, times = nrow(tmp)),
                         perturbation = rep(0, times = nrow(tmp)),
                         #### change replicates here too if needed ####
-                        replicate = c(rep(1, times = nrow(tmp)/3), rep(2, times = nrow(tmp)/3), rep(3, times = nrow(tmp)/3)),
+                        replicate = rep(c(1,2,3), times = nrow(tmp)/3),
+                        # replicate = c(rep(1, times = nrow(tmp)/3), rep(2, times = nrow(tmp)/3), rep(3, times = nrow(tmp)/3)),
                         time = rep(time_E, times = nrow(tmp)),
                         concentration = tmp$concentration,
                         cell_count = tmp$cell_count,
                         cell_count__ctrl = rep(cell_count__ctrl, times = nrow(tmp)),
                         cell_count__time0 = rep(cell_count__time0, times = nrow(tmp)))
-    colnames(final)[6] <- "concentration"
+    # colnames(final)[6] <- "concentration"
     
     write.table(x = final, file = paste0(dir, file_path_sans_ext(file), "_for_GR.tsv"), sep = '\t',
                 quote = FALSE, row.names = FALSE)
