@@ -46,7 +46,12 @@
 parseIncucyte <- function(dir, skip = 2, pattern, treatment,
                           max_conc = NULL, dilution = NULL, series = NULL,
                           control_well_num, control2_well_num = NULL, rm_artefact = NULL,
-                          time_0 = NULL, time_F = NULL, time_E = NULL){
+                          time_0 = NULL, time_F = NULL, time_E = NULL,
+                          machine = NULL){
+  
+  if (is.null(machine)){
+    stop("variable 'machine' must be set to one of 'zoom' or 'flr'")
+  }
   
   inc_files <- list.files(path = dir, pattern = pattern)
   
@@ -163,13 +168,19 @@ parseIncucyte <- function(dir, skip = 2, pattern, treatment,
     
     # I assume 3 replicates
     #### change reps if needed ####
-    concList <- NULL
-    for (dose in conc){
-      x <- rep(dose, times = 3)
-      concList <- c(concList, x)
+    if (machine %in% "zoom"){
+      concList <- NULL
+      for (dose in conc){
+        x <- rep(dose, times = 3)
+        concList <- c(concList, x)
+      }
+      tmp$conc <- concList
     }
-    tmp$conc <- concList
-    # tmp$conc <- as.data.frame(rep(conc, times = 3))
+    
+    if (machine %in% "flr"){
+      tmp$conc <- as.data.frame(rep(conc, times = 3))
+    }
+
     colnames(tmp) <- c("cell_count", "concentration")
     rownames(tmp) <- NULL
     
@@ -181,18 +192,34 @@ parseIncucyte <- function(dir, skip = 2, pattern, treatment,
     cell_line <- str_split(file, pattern = "_", simplify = TRUE)[1]
     
     ## make output df
-    final <- data.frame(cell_line = rep(cell_line, times = nrow(tmp)),
-                        treatment = rep(treatment, times = nrow(tmp)),
-                        perturbation = rep(0, times = nrow(tmp)),
-                        #### change replicates here too if needed ####
-                        replicate = rep(c(1,2,3), times = nrow(tmp)/3),
-                        # replicate = c(rep(1, times = nrow(tmp)/3), rep(2, times = nrow(tmp)/3), rep(3, times = nrow(tmp)/3)),
-                        time = rep(time_E, times = nrow(tmp)),
-                        concentration = tmp$concentration,
-                        cell_count = tmp$cell_count,
-                        cell_count__ctrl = rep(cell_count__ctrl, times = nrow(tmp)),
-                        cell_count__time0 = rep(cell_count__time0, times = nrow(tmp)))
-    # colnames(final)[6] <- "concentration"
+    if (machine %in% "zoom"){
+      final <- data.frame(cell_line = rep(cell_line, times = nrow(tmp)),
+                          treatment = rep(treatment, times = nrow(tmp)),
+                          perturbation = rep(0, times = nrow(tmp)),
+                          #### change replicates here too if needed ####
+                          replicate = rep(c(1,2,3), times = nrow(tmp)/3),
+                          # replicate = c(rep(1, times = nrow(tmp)/3), rep(2, times = nrow(tmp)/3), rep(3, times = nrow(tmp)/3)),
+                          time = rep(time_E, times = nrow(tmp)),
+                          concentration = tmp$concentration,
+                          cell_count = tmp$cell_count,
+                          cell_count__ctrl = rep(cell_count__ctrl, times = nrow(tmp)),
+                          cell_count__time0 = rep(cell_count__time0, times = nrow(tmp)))
+    }
+    
+    if (machine %in% "flr"){
+      final <- data.frame(cell_line = rep(cell_line, times = nrow(tmp)),
+                          treatment = rep(treatment, times = nrow(tmp)),
+                          perturbation = rep(0, times = nrow(tmp)),
+                          #### change replicates here too if needed ####
+                          # replicate = rep(c(1,2,3), times = nrow(tmp)/3),
+                          replicate = c(rep(1, times = nrow(tmp)/3), rep(2, times = nrow(tmp)/3), rep(3, times = nrow(tmp)/3)),
+                          time = rep(time_E, times = nrow(tmp)),
+                          concentration = tmp$concentration,
+                          cell_count = tmp$cell_count,
+                          cell_count__ctrl = rep(cell_count__ctrl, times = nrow(tmp)),
+                          cell_count__time0 = rep(cell_count__time0, times = nrow(tmp)))
+      colnames(final)[6] <- "concentration"
+    }
     
     write.table(x = final, file = paste0(dir, file_path_sans_ext(file), "_for_GR.tsv"), sep = '\t',
                 quote = FALSE, row.names = FALSE)
@@ -293,12 +320,12 @@ incucytePipe <- function(dir, skip = 2, pattern,
                          treatment, max_conc = NULL, dilution = NULL, series = NULL,
                          control_well_num, control2_well_num = NULL, rm_artefact = NULL,
                          time_0 = NULL, time_F = NULL, time_E = NULL,
-                         GR_pattern, doseResponse = FALSE){
+                         GR_pattern, doseResponse = FALSE, machine = NULL){
   
   parseIncucyte(dir = dir, skip = skip, pattern = pattern, treatment = treatment,
                 max_conc = max_conc, dilution = dilution, series = series,
                 control_well_num = control_well_num, control2_well_num = control2_well_num, rm_artefact = rm_artefact,
-                time_0 = time_0, time_F = time_F, time_E = time_E)
+                time_0 = time_0, time_F = time_F, time_E = time_E, machine = machine)
   
   calcGRmetrics(dir = dir, pattern = GR_pattern, doseResponse = doseResponse)
   
