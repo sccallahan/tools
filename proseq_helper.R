@@ -37,6 +37,33 @@ generate_pull_peppro_stats_command <- function(username, path, savedir){
   noquote(paste0(command, from, " ", to))
 }
 
+#' @title generate_pull_peppro_bams_command
+#' 
+#' @description Generates the rsync command needed to pull only the stats.tsv files from peppro outputs
+#' 
+#' @param genome Main genome used for aligments, entered as a string
+#' @param username Your username on seadragon
+#' @param path Top-level directory containing your peppro outputs.
+#' @param savedir Where you'd like to save the files on your local disk
+#' 
+#' @note The resulting command can simply be copy/pasted into the terminal. You will then be prompted for your password.
+#'
+#' @return command in terminal output
+#' @export
+#'
+generate_pull_peppro_bams_command <- function(genome, username, path, savedir){
+  
+  # what is the parent folder?
+  from <- paste0(username, "@seadragon.mdanderson.edu:", path)
+  # where are we saving these files?
+  to <- savedir
+  # generalized rsync command for peppro output structure
+  command <- paste0("rsync -avhPn --include=*/ --include=*/aligned_", genome, "/* --exclude=* --prune-empty-dirs ")
+  # message
+  message("Please copy/paste the following command into the terminal to collect your bams!")
+  # final command
+  noquote(paste0(command, from, " ", to))
+}
 
 #' @title make_proseq_scale_factors
 #' 
